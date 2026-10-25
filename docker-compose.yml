@@ -8,6 +8,18 @@ services:
     tty: true
     stdin_open: true
 
+  # The web UI on http://127.0.0.1:8765, reachable from this machine only.
+  tradingagents-ui:
+    build: .
+    command: ["ui", "--host", "0.0.0.0", "--no-browser"]
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:${TRADINGAGENTS_UI_PORT:-8765}:8765"
+    volumes:
+      - ${TRADINGAGENTS_DATA_DIR:-tradingagents_data}:/home/appuser/.tradingagents
+    restart: unless-stopped
+
   ollama:
     image: ollama/ollama:latest
     volumes:

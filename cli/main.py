@@ -1,3 +1,4 @@
+import os
 import sys
 from enum import StrEnum
 from typing import Annotated
@@ -210,7 +211,8 @@ def ui(
         raise typer.Exit(code=1) from None
 
     url = f"http://{'127.0.0.1' if host in ('0.0.0.0', '::') else host}:{port}"
-    if host not in ("127.0.0.1", "localhost", "::1"):
+    # In Docker the compose file publishes the port on 127.0.0.1 only.
+    if host not in ("127.0.0.1", "localhost", "::1") and not os.environ.get("TRADINGAGENTS_IN_DOCKER"):
         console.print(f"[yellow]The UI has no login; anyone who can reach {host}:{port} can start paid runs.[/yellow]")
     console.print(f"[green]TradingAgents UI:[/green] {url}  (Ctrl+C to stop)")
     if browser:

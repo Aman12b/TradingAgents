@@ -139,6 +139,8 @@ Install the package and its dependencies (`uv pip install .` with uv):
 pip install .
 ```
 
+For the [web UI](#web-ui) as well, install its extra: `pip install ".[ui]"`.
+
 ### Docker
 
 Alternatively, run with Docker:
@@ -155,6 +157,12 @@ For local models with Ollama:
 ```bash
 docker compose --profile ollama run --rm tradingagents-ollama
 ```
+
+For the [web UI](#web-ui), start its service and open http://127.0.0.1:8765:
+```bash
+docker compose up -d tradingagents-ui      # stop with: docker compose stop tradingagents-ui
+```
+It keeps its run history and schedules in the same volume as the results, restarts with Docker so its schedules keep running, and is published on this machine only. `TRADINGAGENTS_UI_PORT` picks another host port. The Claude Code CLI provider is not available in the image; use a local install for it.
 
 ### Required APIs
 
@@ -238,7 +246,7 @@ It shows everything the terminal shows while a run works: each team's agents and
 - **History.** Every run with its rating, duration and tokens; every saved report, from the terminal too; and the memory log's decisions with their returns, alpha and lessons once settled.
 - **Settings.** The provider, models, effort, depth, analysts and language that new runs and schedules start from, with a check that the provider is ready.
 
-The UI keeps its history and schedules in `~/.tradingagents/webui` (`TRADINGAGENTS_WEBUI_DIR` moves them). It has no login, so it listens on 127.0.0.1 unless `--host` says otherwise.
+The UI keeps its history and schedules in `~/.tradingagents/webui` (`TRADINGAGENTS_WEBUI_DIR` moves them). It has no login, so it listens on 127.0.0.1 unless `--host` says otherwise. With Docker, run it as the `tradingagents-ui` service (see [Docker](#docker)).
 
 ### Markets and tickers
 

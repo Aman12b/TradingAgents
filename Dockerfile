@@ -8,7 +8,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 WORKDIR /build
 COPY . .
-RUN pip install --no-cache-dir .
+# The ui extra serves the web UI (`tradingagents ui`, the tradingagents-ui service).
+RUN pip install --no-cache-dir ".[ui]"
 
 FROM python:3.13-slim
 
@@ -24,6 +25,9 @@ RUN useradd --create-home appuser \
  && install -d -m 0755 -o appuser -g appuser /home/appuser/.tradingagents
 USER appuser
 WORKDIR /home/appuser/app
+
+# The web UI's port.
+EXPOSE 8765
 
 COPY --from=builder --chown=appuser:appuser /build .
 

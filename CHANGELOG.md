@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Changes that need action when upgrading are listed under "Upgrading from" in their release.
 
+## [Unreleased]
+
+### Added
+
+- **Your Claude plan through the Claude Code CLI.** The `claude_cli` provider runs each model call through `claude -p`, headless and with Claude Code's own tools off, so a run uses the plan the CLI is signed in with instead of an API key. The analysts' tool calls and the managers' structured decisions go through the CLI's `--json-schema`. Choose "Claude Code CLI" in the provider menu, or set `llm_provider="claude_cli"`; the executable is found on `PATH` or in the VS Code / Cursor extension, or set with `TRADINGAGENTS_CLAUDE_CLI`. Not available in the Docker image.
+- **Web UI.** `tradingagents ui` (extra `ui`; the `tradingagents-ui` service in Docker) shows a run as the terminal does, and adds a queue with pause, resume, cancel and retry, recurring schedules with their next start, the history of runs, saved reports and memory-log decisions, and the default run settings.
+
 ## [0.7.0] — 2026-10-16
 
 Runs on your ChatGPT plan, backtests scored from the first close after each decision, a note at start-up when a newer release is out, and a wheel attached to each GitHub release.
