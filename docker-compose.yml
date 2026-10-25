@@ -3,6 +3,9 @@ services:
     build: .
     env_file:
       - .env
+    environment:
+      # API keys saved from the web UI, kept in the data volume.
+      - TRADINGAGENTS_ENV_FILE=/home/appuser/.tradingagents/keys.env
     volumes:
       - ${TRADINGAGENTS_DATA_DIR:-tradingagents_data}:/home/appuser/.tradingagents
     tty: true
@@ -14,6 +17,8 @@ services:
     command: ["ui", "--host", "0.0.0.0", "--no-browser"]
     env_file:
       - .env
+    environment:
+      - TRADINGAGENTS_ENV_FILE=/home/appuser/.tradingagents/keys.env
     ports:
       - "127.0.0.1:${TRADINGAGENTS_UI_PORT:-8765}:8765"
     volumes:
@@ -34,6 +39,7 @@ services:
     environment:
       - TRADINGAGENTS_LLM_PROVIDER=ollama
       - OLLAMA_BASE_URL=http://ollama:11434/v1
+      - TRADINGAGENTS_ENV_FILE=/home/appuser/.tradingagents/keys.env
     volumes:
       - ${TRADINGAGENTS_DATA_DIR:-tradingagents_data}:/home/appuser/.tradingagents
     depends_on:

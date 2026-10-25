@@ -220,7 +220,10 @@ def ui(
         import webbrowser
 
         threading.Timer(1.5, lambda: webbrowser.open(url)).start()
-    uvicorn.run(create_app(), host=host, port=port, log_level="warning")
+    # Served beyond this machine, the page answers to whatever name it is reached by.
+    local = host in ("127.0.0.1", "localhost", "::1") or os.environ.get("TRADINGAGENTS_IN_DOCKER")
+    app_kwargs = {} if local else {"allowed_hosts": None}
+    uvicorn.run(create_app(**app_kwargs), host=host, port=port, log_level="warning")
 
 
 if __name__ == "__main__":

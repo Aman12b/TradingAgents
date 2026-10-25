@@ -11,7 +11,8 @@ function h(value) {
 }
 
 async function api(path, options = {}) {
-  const init = { method: options.method || "GET", headers: {} };
+  // The server refuses changes without this header, so other sites cannot make them.
+  const init = { method: options.method || "GET", headers: { "X-TradingAgents": "1" } };
   if (options.body !== undefined) {
     init.headers["Content-Type"] = "application/json";
     init.body = JSON.stringify(options.body);
@@ -181,7 +182,7 @@ function bindSettingsFields(root, v) {
       const s = await api(`/api/providers/${encodeURIComponent(sel.value)}`);
       status.innerHTML = s.ready
         ? `<span style="color:var(--good)">✓ bereit</span>${s.detail ? " · " + h(s.detail) : ""}`
-        : `<span style="color:var(--bad)">✗ ${h(s.problem)}</span>`;
+        : `<span style="color:var(--bad)">✗ ${h(s.problem)}</span> <a href="#/keys">→ Key eintragen</a>`;
     } catch (e) { status.textContent = e.message; }
   }
   sel.addEventListener("change", () => {
@@ -632,6 +633,74 @@ views.reports = async () => {
   draw();
 };
 
+// --- API keys ------------------------------------------------------------------------
+
+views.keys = async () => {
+  main.innerHTML = `<div id="vk"></div>`;
+  const root = $("#vk");
+  let open = null;   // the key whose editor is open
+
+  const row = k => `
+    <tr data-key="${h(k.name)}">
+      <td style="width:34%"><b>${h(k.label)}</b><div class="small muted"><code>${h(k.name)}</code></div></td>
+      <td style="width:22%">${k.set
+        ? `<span class="badge completed">✓ gesetzt</span> <code class="small">${h(k.preview)}</code>${k.source === "environment" ? `<div class="small muted">aus Umgebungsvariable</div>` : ""}`
+        : `<span class="badge">nicht gesetzt</span>`}</td>
+      <td class="small muted">${h(k.help || "")}${k.url ? ` <a href="${h(k.url)}" target="_blank" rel="noopener">Key holen ↗</a>` : ""}</td>
+      <td style="width:1%"><div class="actions">
+        <button class="small" data-act="edit">${k.set ? "Ändern" : "Eintragen"}</button>
+        ${k.set && k.source === "file" ? `<button class="small danger" data-act="remove">Entfernen</button>` : ""}</div></td>
+    </tr>
+    ${open === k.name ? `
+    <tr data-key="${h(k.name)}"><td colspan="4">
+      <form class="row" data-form>
+        <input type="${k.secret ? "password" : "text"}" name="value" placeholder="${h(k.placeholder || (k.secret ? "Neuen Key einfügen" : ""))}" value="${k.secret ? "" : h(k.preview)}" autocomplete="off" class="grow" style="max-width:520px" autofocus>
+        ${k.secret ? `<label class="check small"><input type="checkbox" data-show>anzeigen</label>` : ""}
+        <button class="primary small" type="submit">Speichern</button><button class="small" type="button" data-act="close">Abbrechen</button>
+      </form></td></tr>` : ""}`;
+
+  async function draw(data) {
+    data = data || await api("/api/keys");
+    root.innerHTML = `
+      <h1>API-Keys &amp; Datenquellen</h1>
+      <div class="note small" style="margin-bottom:16px">
+        Gespeichert in <code>${h(data.env_file)}</code>${data.env_file_exists ? "" : " (wird beim ersten Speichern angelegt)"} – dieselbe Datei, die auch das Terminal liest.
+        Neue Keys gelten sofort, ohne Neustart. Angezeigt werden nur die letzten vier Zeichen.
+        Keys, die als Umgebungsvariable gesetzt sind, kannst du hier überschreiben, aber nicht entfernen.
+      </div>
+      ${data.groups.map(g => `
+        <div class="panel"><h2>${h(g.group)}</h2>
+          <div class="table-wrap"><table class="list"><tbody>${g.keys.map(row).join("")}</tbody></table></div>
+        </div>`).join("")}`;
+    const input = $("[data-form] [name=value]", root);
+    if (input) input.focus();
+  }
+
+  root.addEventListener("click", async e => {
+    const show = e.target.closest("[data-show]");
+    if (show) { $("[data-form] [name=value]", root).type = show.checked ? "text" : "password"; return; }
+    const btn = e.target.closest("[data-act]");
+    if (!btn) return;
+    const name = btn.closest("[data-key]").dataset.key;
+    if (btn.dataset.act === "edit") { open = name; return draw(); }
+    if (btn.dataset.act === "close") { open = null; return draw(); }
+    if (btn.dataset.act === "remove") {
+      if (!confirm(`${name} aus der .env entfernen?`)) return;
+      open = null;
+      draw(await act(() => api(`/api/keys/${encodeURIComponent(name)}`, { method: "DELETE" }), "Entfernt"));
+    }
+  });
+  root.addEventListener("submit", async e => {
+    e.preventDefault();
+    const name = e.target.closest("[data-key]").dataset.key;
+    const value = $("[name=value]", e.target).value;
+    const data = await act(() => api(`/api/keys/${encodeURIComponent(name)}`, { method: "PUT", body: { value } }), "Gespeichert – gilt ab sofort");
+    open = null;
+    draw(data);
+  });
+  draw();
+};
+
 // --- settings ------------------------------------------------------------------------
 
 views.settings = async () => {
@@ -652,7 +721,7 @@ views.settings = async () => {
         <tr><td class="muted">Daten-Cache</td><td><code>${h(paths.cache_dir)}</code></td></tr>
         <tr><td class="muted">UI-Daten (Verlauf, Zeitpläne)</td><td><code>${h(paths.ui_dir)}</code></td></tr>
       </tbody></table>
-      <p class="muted small">API-Keys kommen aus der <code>.env</code>-Datei bzw. den Umgebungsvariablen. Nach einer Änderung dort die UI neu starten.</p>
+      <p class="muted small">API-Keys und Datenquellen trägst du unter <a href="#/keys">API-Keys</a> ein.</p>
     </div>`;
   const f = $("#sf");
   bindSettingsFields(f, v);

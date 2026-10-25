@@ -2,7 +2,14 @@
 
 __version__ = "0.7.0"
 
+import os
+
 from dotenv import find_dotenv, load_dotenv
+
+# Keys saved from the web UI to the file TRADINGAGENTS_ENV_FILE names (in Docker,
+# one in the data volume) were set on purpose, so they win over the environment.
+if os.environ.get("TRADINGAGENTS_ENV_FILE"):
+    load_dotenv(os.environ["TRADINGAGENTS_ENV_FILE"], override=True)
 
 # Load .env at package import so DEFAULT_CONFIG's env-var overlay and every LLM
 # client see the user's keys whichever entry point started the process.

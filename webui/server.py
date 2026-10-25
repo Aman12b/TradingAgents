@@ -6,19 +6,28 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Body, FastAPI, HTTPException
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi import Body, FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
 from cli.display import MessageBuffer
 
-from . import history
+from . import history, keys
 from .runner import ACTIVE, COMPLETED, JobManager, make_job
 from .schedules import WEEKDAYS, Scheduler
 from .settings import ANALYSTS, builtin_defaults, clean_settings, options, provider_status
 from .store import DEFAULT_DIR, JsonStore
 
 STATIC = Path(__file__).parent / "static"
+
+# Host names the page answers to when it serves this machine only. Checking them
+# stops a web page from reaching the UI through a DNS name rebound to 127.0.0.1.
+LOCAL_HOSTS = ("127.0.0.1", "localhost", "::1", "[::1]")
+
+# Every change the page makes carries this header. A browser sends a custom header
+# cross-site only after a preflight this server never grants, so another site
+# cannot start runs or save keys from a visitor's browser.
+CSRF_HEADER = "X-TradingAgents"
 
 # The report's parts in reading order: (state path, agent, team).
 SECTIONS = [
@@ -37,6 +46,13 @@ SECTIONS = [
 ]
 
 TEAMS = [("Analyst Team", None), *MessageBuffer.FIXED_AGENTS.items()]
+
+
+def _host_name(header: str) -> str:
+    """The host of a Host header, without its port: ``[::1]:8765`` gives ``[::1]``."""
+    if header.startswith("["):
+        return header.split("]", 1)[0] + "]"
+    return header.rsplit(":", 1)[0]
 
 
 def _elapsed(job: dict, live) -> float | None:
@@ -129,7 +145,9 @@ def detail(manager: JobManager, job_id: str, rev: int | None = None) -> dict:
     return shown
 
 
-def create_app(store_dir: Path | str = DEFAULT_DIR, start: bool = True, execute=None) -> FastAPI:
+def create_app(store_dir: Path | str = DEFAULT_DIR, start: bool = True, execute=None,
+               allowed_hosts: tuple[str, ...] | None = LOCAL_HOSTS) -> FastAPI:
+    """The app; ``allowed_hosts`` None answers any Host, for a UI served to a network."""
     store = JsonStore(store_dir)
 
     def defaults() -> dict:
@@ -149,6 +167,15 @@ def create_app(store_dir: Path | str = DEFAULT_DIR, start: bool = True, execute=
 
     app = FastAPI(title="TradingAgents", lifespan=lifespan)
     app.state.manager, app.state.scheduler, app.state.store = manager, scheduler, store
+
+    @app.middleware("http")
+    async def guard(request: Request, call_next):
+        host = _host_name(request.headers.get("host") or "")
+        if allowed_hosts is not None and host not in allowed_hosts:
+            return JSONResponse({"detail": "Unknown host"}, status_code=403)
+        if request.method not in ("GET", "HEAD", "OPTIONS") and request.headers.get(CSRF_HEADER) != "1":
+            return JSONResponse({"detail": f"Missing {CSRF_HEADER} header"}, status_code=403)
+        return await call_next(request)
 
     def job_or_404(job_id):
         try:
@@ -180,6 +207,26 @@ def create_app(store_dir: Path | str = DEFAULT_DIR, start: bool = True, execute=
     def reset_settings():
         store.save("settings", {})
         return defaults()
+
+    @app.get("/api/keys")
+    def get_keys():
+        return keys.status()
+
+    @app.put("/api/keys/{name}")
+    def put_key(name: str, body: Annotated[dict, Body()]):
+        try:
+            keys.save(name, str(body.get("value") or ""))
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from None
+        return keys.status()
+
+    @app.delete("/api/keys/{name}")
+    def delete_key(name: str):
+        try:
+            keys.remove(name)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from None
+        return keys.status()
 
     @app.get("/api/providers/{provider}")
     def get_provider(provider: str):

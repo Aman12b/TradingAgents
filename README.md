@@ -162,7 +162,7 @@ For the [web UI](#web-ui), start its service and open http://127.0.0.1:8765:
 ```bash
 docker compose up -d tradingagents-ui      # stop with: docker compose stop tradingagents-ui
 ```
-It keeps its run history and schedules in the same volume as the results, restarts with Docker so its schedules keep running, and is published on this machine only. `TRADINGAGENTS_UI_PORT` picks another host port. The Claude Code CLI provider is not available in the image; use a local install for it.
+It keeps its run history, schedules and the API keys entered on its page (`keys.env`, which the other services read too) in the same volume as the results, restarts with Docker so its schedules keep running, and is published on this machine only. `TRADINGAGENTS_UI_PORT` picks another host port. The Claude Code CLI provider is not available in the image; use a local install for it.
 
 ### Required APIs
 
@@ -245,8 +245,9 @@ It shows everything the terminal shows while a run works: each team's agents and
 - **Schedules.** Analyse a watchlist at set times on set weekdays, for the day of the start or the previous trading day, with the next start and a countdown shown. Schedules run while the UI is up; a start missed while it was down is skipped, not made up.
 - **History.** Every run with its rating, duration and tokens; every saved report, from the terminal too; and the memory log's decisions with their returns, alpha and lessons once settled.
 - **Settings.** The provider, models, effort, depth, analysts and language that new runs and schedules start from, with a check that the provider is ready.
+- **API keys.** Enter, change or remove each provider's key and the data-source settings (`FRED_API_KEY`, `SEC_EDGAR_USER_AGENT`, `TYPESAFE_API_KEY`, `ALPHA_VANTAGE_API_KEY`). They are saved to the same `.env` the CLI reads, owner-only, and apply to the next call without a restart; the page shows only a secret's last four characters.
 
-The UI keeps its history and schedules in `~/.tradingagents/webui` (`TRADINGAGENTS_WEBUI_DIR` moves them). It has no login, so it listens on 127.0.0.1 unless `--host` says otherwise. With Docker, run it as the `tradingagents-ui` service (see [Docker](#docker)).
+The UI keeps its history and schedules in `~/.tradingagents/webui` (`TRADINGAGENTS_WEBUI_DIR` moves them). It has no login, so it listens on 127.0.0.1 unless `--host` says otherwise, and on 127.0.0.1 it answers only to local host names and to changes sent by its own page, so another website open in your browser cannot use it. Set `TRADINGAGENTS_ENV_FILE` to save keys to another file; values in that file take precedence over the environment. With Docker, run it as the `tradingagents-ui` service (see [Docker](#docker)).
 
 ### Markets and tickers
 

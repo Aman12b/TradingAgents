@@ -241,8 +241,71 @@ def test_a_schedule_needs_tickers_times_and_weekdays(tmp_path, settings):
 @pytest.fixture
 def client(tmp_path):
     app = create_app(tmp_path, start=False)
-    with TestClient(app) as client:
+    with TestClient(app, base_url="http://127.0.0.1:8765", headers={"X-TradingAgents": "1"}) as client:
         yield client
+
+
+def test_a_change_without_the_page_header_is_refused(tmp_path):
+    with TestClient(create_app(tmp_path, start=False), base_url="http://127.0.0.1:8765") as bare:
+        assert bare.get("/api/options").status_code == 200
+        assert bare.post("/api/jobs", json={"tickers": "NVDA"}).status_code == 403
+
+
+def test_a_request_under_another_host_name_is_refused(tmp_path):
+    app = create_app(tmp_path, start=False)
+    with TestClient(app, base_url="http://evil.example:8765") as other:
+        assert other.get("/api/keys").status_code == 403
+    with TestClient(create_app(tmp_path, start=False, allowed_hosts=None),
+                    base_url="http://192.168.1.5:8765") as lan:
+        assert lan.get("/api/options").status_code == 200
+
+
+@pytest.fixture
+def env_file(tmp_path, monkeypatch):
+    path = tmp_path / "keys.env"
+    monkeypatch.setenv("TRADINGAGENTS_ENV_FILE", str(path))
+    for name in ("FRED_API_KEY", "SEC_EDGAR_USER_AGENT"):
+        monkeypatch.delenv(name, raising=False)
+    return path
+
+
+def _key(status, name):
+    return next(k for g in status["groups"] for k in g["keys"] if k["name"] == name)
+
+
+def test_a_key_is_saved_to_the_env_file_and_used_at_once(client, env_file):
+    import os
+
+    status = client.put("/api/keys/FRED_API_KEY", json={"value": " abcdef123456 "}).json()
+    fred = _key(status, "FRED_API_KEY")
+    assert fred["set"] and fred["source"] == "file"
+    assert fred["preview"] == "••••3456"
+    assert "abcdef123456" not in client.get("/api/keys").text
+    assert os.environ["FRED_API_KEY"] == "abcdef123456"
+    assert "FRED_API_KEY='abcdef123456'" in env_file.read_text()
+
+    sec = _key(client.put("/api/keys/SEC_EDGAR_USER_AGENT", json={"value": "Ann Lee ann@example.com"}).json(),
+               "SEC_EDGAR_USER_AGENT")
+    assert sec["preview"] == "Ann Lee ann@example.com"   # not a secret, shown whole
+
+    status = client.delete("/api/keys/FRED_API_KEY").json()
+    assert not _key(status, "FRED_API_KEY")["set"]
+    assert "FRED_API_KEY" not in os.environ
+    assert "FRED_API_KEY" not in env_file.read_text()
+
+
+def test_only_known_keys_on_one_line_are_saved(client, env_file):
+    assert client.put("/api/keys/PATH", json={"value": "x"}).status_code == 400
+    assert client.put("/api/keys/FRED_API_KEY", json={"value": "a\nEVIL=1"}).status_code == 400
+    assert client.put("/api/keys/FRED_API_KEY", json={"value": "  "}).status_code == 400
+    assert not env_file.exists()
+
+
+def test_the_key_page_lists_providers_and_data_sources(client, env_file):
+    groups = {g["group"]: [k["name"] for k in g["keys"]] for g in client.get("/api/keys").json()["groups"]}
+    assert "ANTHROPIC_API_KEY" in groups["LLM-Provider"]
+    assert {"FRED_API_KEY", "ALPHA_VANTAGE_API_KEY", "TYPESAFE_API_KEY", "SEC_EDGAR_USER_AGENT"} <= set(
+        groups["Datenquellen"])
 
 
 def test_the_page_and_its_choices_are_served(client):
