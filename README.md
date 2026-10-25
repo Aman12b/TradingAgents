@@ -186,6 +186,8 @@ For Azure OpenAI, copy `.env.enterprise.example` to `.env.enterprise` and fill i
 
 To run on your ChatGPT Plus or Pro plan instead of an API key, choose "Subscription" in the CLI's provider menu, or set `llm_provider: "chatgpt"`. Sign in once with `tradingagents login chatgpt`: it prints an address to open in your browser, which returns to this machine on `127.0.0.1`. When the browser runs on another machine, or TradingAgents runs in Docker (`docker compose run --rm tradingagents login chatgpt`), paste the address the browser ends up on. The sign-in is kept in `~/.tradingagents/chatgpt-auth.json`, and `tradingagents logout chatgpt` revokes it. Runs count toward your plan's usage limits, and the plan does not accept `temperature` or `max_tokens`.
 
+To run on your Claude plan through the [Claude Code](https://claude.com/claude-code) CLI instead of an API key, choose "Claude Code CLI" in the CLI's provider menu, or set `llm_provider: "claude_cli"`. Sign in once by running `claude`. Each model call runs `claude -p` headless, with Claude Code's own tools switched off; the analysts' tool calls and the managers' structured decisions go through its `--json-schema`. Models are the CLI's aliases (`sonnet`, `opus`, `haiku`, `fable`) or a full model ID, and `anthropic_effort` sets `--effort`. The executable is found on `PATH`, else in the VS Code or Cursor extension; set `TRADINGAGENTS_CLAUDE_CLI` to point at another one. Runs count toward your plan's usage limits, and `temperature` and `max_tokens` are not sent. The Docker image does not include the CLI, so use a local install for this provider.
+
 For AWS Bedrock, install the extra with `pip install ".[bedrock]"`, set `llm_provider: "bedrock"`, configure AWS credentials (environment variables, `~/.aws/credentials`, or an IAM role) and `AWS_DEFAULT_REGION`, and use a Bedrock model ID, e.g. `us.anthropic.claude-opus-5-5`.
 
 For local models, configure Ollama with `llm_provider: "ollama"`. The default endpoint is `http://localhost:11434/v1`; set `OLLAMA_BASE_URL` to point at a remote `ollama-serve`. Pull models with `ollama pull <name>`, and pick "Custom model ID" in the CLI for any model not listed by default.
@@ -219,6 +221,24 @@ Each flag skips only its own question. Run without a terminal, a missing answer 
 At start-up the interactive CLI mentions a newer release and notices from Tauric Research. It checks at most once a day, in the background, and sends nothing about your runs; set `TRADINGAGENTS_NO_UPDATE_CHECK=1` to turn it off. Runs without a terminal never check.
 
 A saved report also includes `complete_report.html`, the report as one page with its sections listed beside the text, for reading in a browser, on a phone or in print. Answering the save question at the prompt also asks about the page and can open it in your browser; `--no-html` skips it, and so does `ta.save_reports(state, "NVDA", html=False)` from Python.
+
+### Web UI
+
+For a browser instead of the terminal, install the extra and open the UI:
+```bash
+pip install ".[ui]"
+tradingagents ui                 # http://127.0.0.1:8765, opens your browser
+tradingagents ui --port 9000 --no-browser
+```
+It shows everything the terminal shows while a run works: each team's agents and their status, the messages and tool calls as they happen, the reports as they are written, and the counts of model calls, tool calls and tokens. It also adds:
+
+- **A queue.** Runs go one after another; queue several tickers at once, reorder what waits, and pause the whole queue.
+- **Pause, resume and cancel.** A pause holds the run at its next model or tool call, and the paused time is not counted. A run that failed, was cancelled, or was cut off by a restart can be retried, and with checkpoints on (the UI's default) it resumes where it stopped.
+- **Schedules.** Analyse a watchlist at set times on set weekdays, for the day of the start or the previous trading day, with the next start and a countdown shown. Schedules run while the UI is up; a start missed while it was down is skipped, not made up.
+- **History.** Every run with its rating, duration and tokens; every saved report, from the terminal too; and the memory log's decisions with their returns, alpha and lessons once settled.
+- **Settings.** The provider, models, effort, depth, analysts and language that new runs and schedules start from, with a check that the provider is ready.
+
+The UI keeps its history and schedules in `~/.tradingagents/webui` (`TRADINGAGENTS_WEBUI_DIR` moves them). It has no login, so it listens on 127.0.0.1 unless `--host` says otherwise.
 
 ### Markets and tickers
 

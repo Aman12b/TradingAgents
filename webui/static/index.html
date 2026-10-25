@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TradingAgents</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='7' fill='%234f8cff'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div class="brand"><span class="dot"></span>TradingAgents</div>
+      <div class="chips" id="chips"></div>
+      <button class="small" id="theme" title="Hell/Dunkel umschalten">◐</button>
+    </header>
+    <nav class="side" id="nav">
+      <a href="#/live" data-view="live">▶ Live</a>
+      <a href="#/new" data-view="new">＋ Neue Analyse</a>
+      <a href="#/jobs" data-view="jobs">☰ Warteschlange &amp; Verlauf <span class="count" id="count-queue"></span></a>
+      <a href="#/schedules" data-view="schedules">⏱ Zeitpläne</a>
+      <a href="#/decisions" data-view="decisions">◎ Entscheidungen</a>
+      <a href="#/reports" data-view="reports">▤ Berichte</a>
+      <a href="#/settings" data-view="settings">⚙ Einstellungen</a>
+    </nav>
+    <main id="main"></main>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

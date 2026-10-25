@@ -194,5 +194,32 @@ def logout(plan: Annotated[Plan, typer.Argument(help="The plan to sign out of")]
         console.print("Not signed in to ChatGPT.")
 
 
+@app.command()
+def ui(
+    host: str = typer.Option("127.0.0.1", "--host", help="Address to serve on; 0.0.0.0 opens it to your network"),
+    port: int = typer.Option(8765, "--port", help="Port to serve on"),
+    browser: bool = typer.Option(True, "--browser/--no-browser", help="Open the page in your browser"),
+):
+    """Open the web UI: start, watch, pause and schedule runs, and read past results."""
+    try:
+        import uvicorn
+
+        from webui.server import create_app
+    except ImportError:
+        console.print('[red]The web UI needs its extra: pip install ".[ui]"[/red]')
+        raise typer.Exit(code=1) from None
+
+    url = f"http://{'127.0.0.1' if host in ('0.0.0.0', '::') else host}:{port}"
+    if host not in ("127.0.0.1", "localhost", "::1"):
+        console.print(f"[yellow]The UI has no login; anyone who can reach {host}:{port} can start paid runs.[/yellow]")
+    console.print(f"[green]TradingAgents UI:[/green] {url}  (Ctrl+C to stop)")
+    if browser:
+        import threading
+        import webbrowser
+
+        threading.Timer(1.5, lambda: webbrowser.open(url)).start()
+    uvicorn.run(create_app(), host=host, port=port, log_level="warning")
+
+
 if __name__ == "__main__":
     app()

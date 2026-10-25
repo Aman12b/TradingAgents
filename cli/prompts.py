@@ -383,6 +383,7 @@ def _llm_provider_table() -> list[tuple[str, str, str | None]]:
         ("Google", "google", None),
         ("Anthropic", "anthropic", "https://api.anthropic.com/"),
         ("ChatGPT (Plus or Pro plan)", "chatgpt", "https://api.openai.com/v1"),
+        ("Claude Code CLI (your Claude plan, no API key)", "claude_cli", None),
         ("xAI", "xai", "https://api.x.ai/v1"),
         ("DeepSeek", "deepseek", "https://api.deepseek.com"),
         ("Qwen", "qwen", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"),
@@ -681,6 +682,23 @@ def ensure_signed_in(provider: str) -> None:
         if subprocess.run(login).returncode != 0:
             raise typer.Exit(code=1) from None
     console.print(f"[green]✓ Using your ChatGPT plan:[/green] {escape(chatgpt_auth.signed_in_as() or '')}")
+
+
+def ensure_claude_cli(provider: str) -> None:
+    """Make sure the Claude Code CLI is there before a ``claude_cli`` run.
+
+    The CLI keeps its own sign-in; a run that is not signed in fails at its
+    first call with the CLI's own message.
+    """
+    if provider.lower() != "claude_cli":
+        return
+    from tradingagents.llm_clients.claude_cli_client import INSTALL_HINT, find_claude_cli
+
+    cli = find_claude_cli()
+    if not cli:
+        console.print(f"[red]{escape(INSTALL_HINT)}[/red]")
+        raise typer.Exit(code=1)
+    console.print(f"[green]✓ Using the Claude Code CLI:[/green] {escape(cli)}")
 
 
 def ensure_api_key(provider: str) -> str | None:

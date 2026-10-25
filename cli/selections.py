@@ -24,6 +24,7 @@ from cli.prompts import (
     confirm_ollama_endpoint,
     detect_asset_type,
     ensure_api_key,
+    ensure_claude_cli,
     ensure_signed_in,
     get_ticker,
     parse_analysis_date,
@@ -38,7 +39,7 @@ from cli.prompts import (
     select_shallow_thinking_agent,
 )
 from tradingagents.default_config import DEFAULT_CONFIG
-from tradingagents.llm_clients.factory import REASONING_EFFORT_PROVIDERS
+from tradingagents.llm_clients.factory import ANTHROPIC_EFFORT_PROVIDERS, REASONING_EFFORT_PROVIDERS
 from tradingagents.llm_clients.openai_client import check_endpoint
 
 
@@ -100,6 +101,7 @@ def _check_tier_providers(main_provider: str, backend_url: str | None = None) ->
             used.append(provider)
     for provider in used:
         ensure_signed_in(provider)
+        ensure_claude_cli(provider)
         ensure_api_key(provider)
 
 
@@ -347,7 +349,7 @@ def _prompt_selections(prefs, flags):
             "Reasoning effort", "Step 8: Reasoning Effort",
             "Configure OpenAI reasoning effort level", ask_openai_reasoning_effort,
         )
-    elif provider_lower == "anthropic":
+    elif provider_lower in ANTHROPIC_EFFORT_PROVIDERS:
         anthropic_effort = thinking_value_or_prompt(
             "TRADINGAGENTS_ANTHROPIC_EFFORT", "anthropic_effort",
             "Claude effort", "Step 8: Effort Level",

@@ -13,14 +13,13 @@ from rich.live import Live
 from cli.display import (
     ANALYST_ORDER,
     AnalystWallTimeTracker,
-    classify_message_type,
+    apply_chunk,
     console,
     create_layout,
     display_complete_report,
     message_buffer,
-    update_analyst_statuses,
+    record_messages,
     update_display,
-    update_research_team_status,
 )
 from cli.selections import depth_from_env, get_user_selections, unattended_gaps
 from cli.stats_handler import StatsCallbackHandler
@@ -239,104 +238,13 @@ def run_analysis(checkpoint: bool | None = None, portfolio=None, flags=None):
         trace = []
         try:
             for messages, chunk in graph.stream_run(graph.checkpoint_input(init_agent_state), **args):
-                for message in messages:
-                    msg_id = getattr(message, "id", None)
-                    if msg_id is not None:
-                        if msg_id in message_buffer._processed_message_ids:
-                            continue
-                        message_buffer._processed_message_ids.add(msg_id)
-
-                    msg_type, content = classify_message_type(message)
-                    if content and content.strip():
-                        message_buffer.add_message(msg_type, content)
-
-                    if hasattr(message, "tool_calls") and message.tool_calls:
-                        for tool_call in message.tool_calls:
-                            if isinstance(tool_call, dict):
-                                message_buffer.add_tool_call(tool_call["name"], tool_call["args"])
-                            else:
-                                message_buffer.add_tool_call(tool_call.name, tool_call.args)
+                record_messages(message_buffer, messages)
 
                 if chunk is None:   # a step inside an analyst's graph: messages only
                     update_display(layout, stats_handler=stats_handler, start_time=start_time)
                     continue
 
-                update_analyst_statuses(
-                    message_buffer,
-                    chunk,
-                    wall_time_tracker=analyst_wall_time_tracker,
-                )
-
-                # Research Team - Handle Investment Debate State
-                if chunk.get("investment_debate_state"):
-                    debate_state = chunk["investment_debate_state"]
-                    bull_hist = debate_state.get("bull_history", "").strip()
-                    bear_hist = debate_state.get("bear_history", "").strip()
-                    judge = (chunk.get("investment_plan") or "").strip()
-
-                    # Only update status when there's actual content
-                    if bull_hist or bear_hist:
-                        update_research_team_status("in_progress")
-                    if bull_hist:
-                        message_buffer.update_report_section(
-                            "investment_plan", f"### Bull Researcher Analysis\n{bull_hist}"
-                        )
-                    if bear_hist:
-                        message_buffer.update_report_section(
-                            "investment_plan", f"### Bear Researcher Analysis\n{bear_hist}"
-                        )
-                    if judge:
-                        message_buffer.update_report_section(
-                            "investment_plan", f"### Research Manager Decision\n{judge}"
-                        )
-                        update_research_team_status("completed")
-                        message_buffer.update_agent_status("Trader", "in_progress")
-
-                # Trading Team
-                if chunk.get("trader_investment_plan"):
-                    message_buffer.update_report_section(
-                        "trader_investment_plan", chunk["trader_investment_plan"]
-                    )
-                    if message_buffer.agent_status.get("Trader") != "completed":
-                        message_buffer.update_agent_status("Trader", "completed")
-                        message_buffer.update_agent_status("Aggressive Analyst", "in_progress")
-
-                # Risk Management Team - Handle Risk Debate State
-                if chunk.get("risk_debate_state"):
-                    risk_state = chunk["risk_debate_state"]
-                    agg_hist = risk_state.get("aggressive_history", "").strip()
-                    con_hist = risk_state.get("conservative_history", "").strip()
-                    neu_hist = risk_state.get("neutral_history", "").strip()
-                    judge = (chunk.get("final_trade_decision") or "").strip()
-
-                    if agg_hist:
-                        if message_buffer.agent_status.get("Aggressive Analyst") != "completed":
-                            message_buffer.update_agent_status("Aggressive Analyst", "in_progress")
-                        message_buffer.update_report_section(
-                            "final_trade_decision", f"### Aggressive Analyst Analysis\n{agg_hist}"
-                        )
-                    if con_hist:
-                        if message_buffer.agent_status.get("Conservative Analyst") != "completed":
-                            message_buffer.update_agent_status("Conservative Analyst", "in_progress")
-                        message_buffer.update_report_section(
-                            "final_trade_decision", f"### Conservative Analyst Analysis\n{con_hist}"
-                        )
-                    if neu_hist:
-                        if message_buffer.agent_status.get("Neutral Analyst") != "completed":
-                            message_buffer.update_agent_status("Neutral Analyst", "in_progress")
-                        message_buffer.update_report_section(
-                            "final_trade_decision", f"### Neutral Analyst Analysis\n{neu_hist}"
-                        )
-                    if judge and message_buffer.agent_status.get("Portfolio Manager") != "completed":
-                        message_buffer.update_agent_status("Portfolio Manager", "in_progress")
-                        message_buffer.update_report_section(
-                            "final_trade_decision", f"### Portfolio Manager Decision\n{judge}"
-                        )
-                        message_buffer.update_agent_status("Aggressive Analyst", "completed")
-                        message_buffer.update_agent_status("Conservative Analyst", "completed")
-                        message_buffer.update_agent_status("Neutral Analyst", "completed")
-                        message_buffer.update_agent_status("Portfolio Manager", "completed")
-
+                apply_chunk(message_buffer, chunk, wall_time_tracker=analyst_wall_time_tracker)
                 update_display(layout, stats_handler=stats_handler, start_time=start_time)
 
                 trace.append(chunk)

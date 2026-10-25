@@ -223,6 +223,21 @@ MODEL_OPTIONS: ProviderModeOptions = {
     "bedrock": _CUSTOM_ONLY,
     # The plan's models are listed live from OpenAI once signed in.
     "chatgpt": _CUSTOM_ONLY,
+    # The Claude Code CLI takes an alias for the newest model of each family, or
+    # any full model ID.
+    "claude_cli": {
+        "quick": [
+            ("Sonnet (newest) - Best speed and intelligence balance", "sonnet"),
+            ("Haiku (newest) - Fastest", "haiku"),
+            ("Custom model ID", "custom"),
+        ],
+        "deep": [
+            ("Opus (newest) - Frontier agentic and enterprise work", "opus"),
+            ("Fable (newest) - Most capable", "fable"),
+            ("Sonnet (newest) - Near-frontier intelligence at Sonnet cost", "sonnet"),
+            ("Custom model ID", "custom"),
+        ],
+    },
 }
 
 

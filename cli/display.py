@@ -437,10 +437,12 @@ def display_complete_report(final_state):
         console.print(Panel(Markdown(final_state["final_trade_decision"]), title="Portfolio Manager", border_style="blue", padding=(1, 2)))
 
 
+RESEARCH_TEAM = ["Bull Researcher", "Bear Researcher", "Research Manager"]
+
+
 def update_research_team_status(status):
     """Update status for research team members (not Trader)."""
-    research_team = ["Bull Researcher", "Bear Researcher", "Research Manager"]
-    for agent in research_team:
+    for agent in RESEARCH_TEAM:
         message_buffer.update_agent_status(agent, status)
 
 
@@ -498,6 +500,91 @@ def update_analyst_statuses(message_buffer, chunk, wall_time_tracker=None):
         and message_buffer.agent_status.get("Bull Researcher") == "pending"
     ):
         message_buffer.update_agent_status("Bull Researcher", "in_progress")
+
+
+def record_messages(message_buffer, messages):
+    """Add a step's messages and tool calls to the buffer, each message once."""
+    for message in messages:
+        msg_id = getattr(message, "id", None)
+        if msg_id is not None:
+            if msg_id in message_buffer._processed_message_ids:
+                continue
+            message_buffer._processed_message_ids.add(msg_id)
+
+        msg_type, content = classify_message_type(message)
+        if content and content.strip():
+            message_buffer.add_message(msg_type, content)
+
+        for tool_call in getattr(message, "tool_calls", None) or []:
+            if isinstance(tool_call, dict):
+                message_buffer.add_tool_call(tool_call["name"], tool_call["args"])
+            else:
+                message_buffer.add_tool_call(tool_call.name, tool_call.args)
+
+
+def apply_chunk(message_buffer, chunk, wall_time_tracker=None):
+    """Move agent statuses and report sections on from a top-level step's state."""
+    update_analyst_statuses(message_buffer, chunk, wall_time_tracker=wall_time_tracker)
+
+    # Research Team - Handle Investment Debate State
+    if chunk.get("investment_debate_state"):
+        debate_state = chunk["investment_debate_state"]
+        bull_hist = debate_state.get("bull_history", "").strip()
+        bear_hist = debate_state.get("bear_history", "").strip()
+        judge = (chunk.get("investment_plan") or "").strip()
+
+        # Only update status when there's actual content
+        if bull_hist or bear_hist:
+            for agent in RESEARCH_TEAM:
+                message_buffer.update_agent_status(agent, "in_progress")
+        if bull_hist:
+            message_buffer.update_report_section(
+                "investment_plan", f"### Bull Researcher Analysis\n{bull_hist}"
+            )
+        if bear_hist:
+            message_buffer.update_report_section(
+                "investment_plan", f"### Bear Researcher Analysis\n{bear_hist}"
+            )
+        if judge:
+            message_buffer.update_report_section(
+                "investment_plan", f"### Research Manager Decision\n{judge}"
+            )
+            for agent in RESEARCH_TEAM:
+                message_buffer.update_agent_status(agent, "completed")
+            message_buffer.update_agent_status("Trader", "in_progress")
+
+    # Trading Team
+    if chunk.get("trader_investment_plan"):
+        message_buffer.update_report_section(
+            "trader_investment_plan", chunk["trader_investment_plan"]
+        )
+        if message_buffer.agent_status.get("Trader") != "completed":
+            message_buffer.update_agent_status("Trader", "completed")
+            message_buffer.update_agent_status("Aggressive Analyst", "in_progress")
+
+    # Risk Management Team - Handle Risk Debate State
+    if chunk.get("risk_debate_state"):
+        risk_state = chunk["risk_debate_state"]
+        judge = (chunk.get("final_trade_decision") or "").strip()
+
+        for agent, key in (("Aggressive Analyst", "aggressive_history"),
+                           ("Conservative Analyst", "conservative_history"),
+                           ("Neutral Analyst", "neutral_history")):
+            history = risk_state.get(key, "").strip()
+            if history:
+                if message_buffer.agent_status.get(agent) != "completed":
+                    message_buffer.update_agent_status(agent, "in_progress")
+                message_buffer.update_report_section(
+                    "final_trade_decision", f"### {agent} Analysis\n{history}"
+                )
+        if judge and message_buffer.agent_status.get("Portfolio Manager") != "completed":
+            message_buffer.update_agent_status("Portfolio Manager", "in_progress")
+            message_buffer.update_report_section(
+                "final_trade_decision", f"### Portfolio Manager Decision\n{judge}"
+            )
+            for agent in ("Aggressive Analyst", "Conservative Analyst", "Neutral Analyst",
+                          "Portfolio Manager"):
+                message_buffer.update_agent_status(agent, "completed")
 
 
 def extract_content_string(content):

@@ -37,6 +37,10 @@ def create_llm_client(
         from .anthropic_client import AnthropicClient
         return AnthropicClient(model, base_url, **kwargs)
 
+    if provider_lower == "claude_cli":
+        from .claude_cli_client import ClaudeCLIClient
+        return ClaudeCLIClient(model, base_url, **kwargs)
+
     if provider_lower == "google":
         from .google_client import GoogleClient
         return GoogleClient(model, base_url, **kwargs)
@@ -90,6 +94,9 @@ def _coerce_max_tokens(value):
 # Providers that take OpenAI's ``openai_reasoning_effort``.
 REASONING_EFFORT_PROVIDERS = ("openai", "chatgpt")
 
+# Providers that take Anthropic's ``anthropic_effort``.
+ANTHROPIC_EFFORT_PROVIDERS = ("anthropic", "claude_cli")
+
 
 def build_llm_kwargs(config: dict) -> dict[str, Any]:
     """Keyword arguments for ``create_llm_client`` from a TradingAgents config."""
@@ -106,7 +113,7 @@ def build_llm_kwargs(config: dict) -> dict[str, Any]:
         if reasoning_effort:
             kwargs["reasoning_effort"] = reasoning_effort
 
-    elif provider == "anthropic":
+    elif provider in ANTHROPIC_EFFORT_PROVIDERS:
         effort = config.get("anthropic_effort")
         if effort:
             kwargs["effort"] = effort
